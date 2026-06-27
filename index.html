@@ -116,8 +116,9 @@ body{
 
 .panel{
   flex:1;
-  overflow-y:auto;
+  overflow:hidden;
   display:none;
+  min-height:0;
 }
 .panel.active{display:flex; flex-direction:column;}
 
@@ -760,7 +761,7 @@ input[type=file]{display:none;}
 
     <!-- TAB: CURIERI -->
     <div class="panel active" id="panel-curieri">
-      <div class="section" style="flex:1; overflow-y:auto;">
+      <div class="section" style="flex:1; overflow-y:auto; min-height:0;">
         <div class="section-title">
           <span>Curieri activi</span>
           <span id="courierCount">0</span>
@@ -773,32 +774,34 @@ input[type=file]{display:none;}
 
     <!-- TAB: ADRESE -->
     <div class="panel" id="panel-adrese">
-      <div class="section">
-        <div class="section-title"><span>Import adrese</span></div>
-        <div class="dropzone" id="dropzone">
-          <div class="dz-icon">⇪</div>
-          <div class="dz-title">Trage fișierul aici sau apasă</div>
-          <div class="dz-sub">CSV sau XLSX · nume, telefon, adresă, sumă, plată</div>
+      <div style="flex-shrink:0; overflow-y:auto;">
+        <div class="section">
+          <div class="section-title"><span>Import adrese</span></div>
+          <div class="dropzone" id="dropzone">
+            <div class="dz-icon">⇪</div>
+            <div class="dz-title">Trage fișierul aici sau apasă</div>
+            <div class="dz-sub">CSV sau XLSX · nume, telefon, adresă, sumă, plată</div>
+          </div>
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+          <div class="hint" id="columnPicker" style="display:none;"></div>
+          <button class="btn btn-ghost btn-block" id="addManualBtn" style="margin-top:10px;">+ Adaugă adresă manual</button>
+          <button class="btn btn-ghost btn-block btn-sm" id="resetAddressesBtn" style="margin-top:8px; color:var(--danger); border-color:var(--line);">Resetează adrese</button>
         </div>
-        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
-        <div class="hint" id="columnPicker" style="display:none;"></div>
-        <button class="btn btn-ghost btn-block" id="addManualBtn" style="margin-top:10px;">+ Adaugă adresă manual</button>
-        <button class="btn btn-ghost btn-block btn-sm" id="resetAddressesBtn" style="margin-top:8px; color:var(--danger); border-color:var(--line);">Resetează adrese</button>
-      </div>
-      <div class="section" id="geocodeSection" style="display:none;">
-        <div class="section-title"><span>Geocodare</span></div>
-        <div id="geocodeStatus" class="loading-row"><span class="spinner sp-dark"></span><span>Se localizează adresele…</span></div>
-        <button class="btn btn-primary btn-block" id="geocodeBtn" style="margin-top:8px; display:none;">Localizează adresele</button>
-      </div>
-      <div class="section">
-        <div class="section-title">
-          <span>Bază adrese verificate</span>
-          <span id="verifiedDbCount">0</span>
+        <div class="section" id="geocodeSection" style="display:none;">
+          <div class="section-title"><span>Geocodare</span></div>
+          <div id="geocodeStatus" class="loading-row"><span class="spinner sp-dark"></span><span>Se localizează adresele…</span></div>
+          <button class="btn btn-primary btn-block" id="geocodeBtn" style="margin-top:8px; display:none;">Localizează adresele</button>
         </div>
-        <div class="hint" style="margin-bottom:8px;">Adresele corectate manual sau re-localizate cu precizie se salvează aici, în acest browser, și sunt reutilizate automat la viitoare importuri identice.</div>
-        <button class="btn btn-ghost btn-block btn-sm" id="manageVerifiedDbBtn">Gestionează baza</button>
+        <div class="section">
+          <div class="section-title">
+            <span>Bază adrese verificate</span>
+            <span id="verifiedDbCount">0</span>
+          </div>
+          <div class="hint" style="margin-bottom:8px;">Adresele corectate manual sau re-localizate cu precizie se salvează aici, în acest browser, și sunt reutilizate automat la viitoare importuri identice.</div>
+          <button class="btn btn-ghost btn-block btn-sm" id="manageVerifiedDbBtn">Gestionează baza</button>
+        </div>
       </div>
-      <div class="addr-list" id="addrList">
+      <div class="addr-list" id="addrList" style="flex:1; min-height:0;">
         <div class="empty-state">
           <div class="es-icon">▦</div>
           <div class="es-title">Nicio adresă încărcată</div>
@@ -815,7 +818,7 @@ input[type=file]{display:none;}
         <div class="hint">Adresele se împart pe curieri în funcție de proximitate geografică. Poți rearanja manual mai jos.</div>
         <button class="btn btn-ghost btn-block btn-sm" id="resetRoutesBtn" style="margin-top:8px; color:var(--danger); border-color:var(--line);">Resetează trasee</button>
       </div>
-      <div class="section" style="flex:1; overflow-y:auto;" id="routeSummary">
+      <div class="section" style="flex:1; overflow-y:auto; min-height:0;" id="routeSummary">
         <div class="empty-state">
           <div class="es-icon">→</div>
           <div class="es-title">Niciun traseu generat</div>
