@@ -622,45 +622,51 @@ function showEditAddressForm(addrId){
 }
 
 function showManualAddForm(){
-  const picker = document.getElementById('columnPicker');
-  picker.style.display = 'block';
-  picker.innerHTML = `
-    <div style="margin-bottom:8px; font-weight:600; color:var(--ink); text-transform:none; font-size:12.5px;">Adaugă adresă manual</div>
-    <div class="field" style="margin-bottom:7px;">
-      <label>Nume client</label>
-      <input type="text" id="maName" placeholder="ex: Ana Popescu">
-    </div>
-    <div class="field" style="margin-bottom:7px;">
-      <label>Telefon</label>
-      <input type="text" id="maPhone" placeholder="ex: 07xx xxx xxx">
-    </div>
-    <div class="field" style="margin-bottom:7px;">
-      <label>Adresă (oraș, stradă, nr)</label>
-      <input type="text" id="maAddress" placeholder="ex: Cluj-Napoca, Str. Mihai Eminescu, 10">
-    </div>
-    <div class="field" style="margin-bottom:7px;">
-      <label>Detalii (bloc/scară/ap/interfon)</label>
-      <input type="text" id="maDetails" placeholder="ex: Bloc A2, et 3, ap 12, interfon 12">
-    </div>
-    <div class="field-row" style="margin-bottom:7px;">
-      <div class="field">
-        <label>Sumă (lei)</label>
-        <input type="text" id="maAmount" placeholder="ex: 150">
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">Adaugă adresă manual</div>
+      <div class="field" style="margin-bottom:7px;">
+        <label>Nume client</label>
+        <input type="text" id="maName" placeholder="ex: Ana Popescu">
       </div>
-      <div class="field">
-        <label>Metodă plată</label>
-        <select id="maPayment">
-          ${PAYMENT_METHODS.map(m => `<option value="${m}">${m}</option>`).join('')}
-        </select>
+      <div class="field" style="margin-bottom:7px;">
+        <label>Telefon</label>
+        <input type="text" id="maPhone" placeholder="ex: 07xx xxx xxx">
       </div>
-    </div>
-    <div style="display:flex; gap:6px; margin-top:4px;">
-      <button class="btn btn-ghost btn-sm" id="maCancelBtn" style="flex:1;">Anulează</button>
-      <button class="btn btn-primary btn-sm" id="maConfirmBtn" style="flex:1;">Adaugă</button>
+      <div class="field" style="margin-bottom:7px;">
+        <label>Adresă (oraș, stradă, nr)</label>
+        <input type="text" id="maAddress" placeholder="ex: Cluj-Napoca, Str. Mihai Eminescu, 10">
+      </div>
+      <div class="field" style="margin-bottom:7px;">
+        <label>Detalii (bloc/scară/ap/interfon)</label>
+        <input type="text" id="maDetails" placeholder="ex: Bloc A2, et 3, ap 12, interfon 12">
+      </div>
+      <div class="field-row" style="margin-bottom:7px;">
+        <div class="field">
+          <label>Sumă (lei)</label>
+          <input type="text" id="maAmount" placeholder="ex: 150">
+        </div>
+        <div class="field">
+          <label>Metodă plată</label>
+          <select id="maPayment">
+            ${PAYMENT_METHODS.map(m => `<option value="${m}">${m}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:6px; margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" id="maCancelBtn" style="flex:1;">Anulează</button>
+        <button class="btn btn-primary btn-sm" id="maConfirmBtn" style="flex:1;">Adaugă</button>
+      </div>
     </div>
   `;
+  document.body.appendChild(overlay);
   document.getElementById('maAddress').focus();
-  document.getElementById('maCancelBtn').addEventListener('click', () => { picker.style.display = 'none'; });
+
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.getElementById('maCancelBtn').addEventListener('click', close);
   document.getElementById('maConfirmBtn').addEventListener('click', () => {
     const addressInput = document.getElementById('maAddress').value.trim();
     if (!addressInput){
@@ -676,7 +682,7 @@ function showManualAddForm(){
       amount: parseAmount(document.getElementById('maAmount').value),
       paymentMethod: document.getElementById('maPayment').value
     });
-    picker.style.display = 'none';
+    close();
     renderAddresses();
     switchToTab('panel-adrese');
     maybeShowGeocodeButton();
@@ -736,7 +742,6 @@ function guessColumnMapping(header){
 }
 
 function showColumnMapper(rows){
-  const picker = document.getElementById('columnPicker');
   const numCols = rows[0].length;
   // assume first row is a header if it has text-like, non-numeric cells and there's more than one row
   const looksLikeHeader = rows.length > 1 && rows[0].every(c => isNaN(parseFloat(c)) || c === '');
@@ -751,24 +756,33 @@ function showColumnMapper(rows){
     return opts;
   };
 
-  picker.style.display = 'block';
-  picker.innerHTML = `
-    <div style="margin-bottom:8px; font-weight:600; color:var(--ink); text-transform:none; font-size:12.5px;">
-      Asociază coloanele din fișier
-    </div>
-    <label style="display:flex; align-items:center; gap:5px; margin-bottom:9px; font-weight:400; text-transform:none;">
-      <input type="checkbox" id="hasHeaderCb" ${looksLikeHeader ? 'checked' : ''}> prima linie este antet
-    </label>
-    ${FIELD_DEFS.map(field => `
-      <div class="field" style="margin-bottom:7px;">
-        <label>${field.label}${field.required ? ' *' : ''}</label>
-        <select id="map_${field.key}" style="width:100%; padding:7px; border:1px solid var(--line); border-radius:2px; font-family:inherit; font-size:13px;">
-          ${colOptions(guess[field.key])}
-        </select>
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">Asociază coloanele din fișier</div>
+      <label style="display:flex; align-items:center; gap:5px; margin-bottom:9px; font-weight:400; text-transform:none; font-size:12.5px;">
+        <input type="checkbox" id="hasHeaderCb" ${looksLikeHeader ? 'checked' : ''}> prima linie este antet
+      </label>
+      ${FIELD_DEFS.map(field => `
+        <div class="field" style="margin-bottom:7px;">
+          <label>${field.label}${field.required ? ' *' : ''}</label>
+          <select id="map_${field.key}" style="width:100%; padding:7px; border:1px solid var(--line); border-radius:2px; font-family:inherit; font-size:13px;">
+            ${colOptions(guess[field.key])}
+          </select>
+        </div>
+      `).join('')}
+      <div style="display:flex; gap:6px; margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" id="cancelColBtn" style="flex:1;">Anulează</button>
+        <button class="btn btn-primary btn-sm" id="confirmColBtn" style="flex:1;">Importă ${rows.length - (looksLikeHeader ? 1 : 0)} rânduri</button>
       </div>
-    `).join('')}
-    <button class="btn btn-primary btn-block btn-sm" id="confirmColBtn" style="margin-top:6px;">Importă ${rows.length - (looksLikeHeader ? 1 : 0)} rânduri</button>
+    </div>
   `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.getElementById('cancelColBtn').addEventListener('click', close);
 
   document.getElementById('confirmColBtn').addEventListener('click', () => {
     const hasHeader = document.getElementById('hasHeaderCb').checked;
@@ -816,7 +830,7 @@ function showColumnMapper(rows){
       });
       imported++;
     }
-    picker.style.display = 'none';
+    close();
     renderAddresses();
     switchToTab('panel-adrese');
     maybeShowGeocodeButton();
