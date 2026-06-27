@@ -1439,15 +1439,36 @@ async function balanceRoutesByTime(couriers){
     const longestAddrs = state.addresses.filter(a => a.courierId === longest.courier.id && a.status === 'ok');
     if (longestAddrs.length <= minAllowed) return;
 
-    // move whichever of the longest courier's addresses is closest to the shortest
-    // courier's start point — minimizes the detour cost of the move
-    let moveAddr = null, bestDist = Infinity;
-    longestAddrs.forEach(a => {
-      const d = haversine(a.lat, a.lng, shortest.courier.start.lat, shortest.courier.start.lng);
-      if (d < bestDist){ bestDist = d; moveAddr = a; }
-    });
-    if (!moveAddr) return;
+    // Only consider addresses that sit at the angular EDGE of the longest courier's own
+    // sector, closest to the shortest courier's direction — never an address from deep
+    // inside the sector just because it happens to be close in straight-line distance to
+    // the other courier's start. This keeps each courier's wedge geographically intact.
+    const sectorCenterLat = longestAddrs.reduce((s,a) => s+a.lat, 0) / longestAddrs.length;
+    const sectorCenterLng = longestAddrs.reduce((s,a) => s+a.lng, 0) / longestAddrs.length;
+    const bearingOfShortest = Math.atan2(
+      (shortest.courier.start.lng - sectorCenterLng) * Math.cos(sectorCenterLat * Math.PI / 180),
+      shortest.courier.start.lat - sectorCenterLat
+    ) * 180 / Math.PI;
 
+    // rank longest's addresses by how close their own bearing (from their sector center)
+    // is to the direction of the shortest courier — the "edge facing" candidates come first
+    const ranked = longestAddrs.map(a => {
+      const bearing = Math.atan2(
+        (a.lng - sectorCenterLng) * Math.cos(sectorCenterLat * Math.PI / 180),
+        a.lat - sectorCenterLat
+      ) * 180 / Math.PI;
+      let diff = Math.abs(bearing - bearingOfShortest);
+      if (diff > 180) diff = 360 - diff;
+      return { addr: a, angularDist: diff };
+    }).sort((a, b) => a.angularDist - b.angularDist);
+
+    // Only the closest-bearing candidate is eligible, and only if it's a genuine edge case
+    // (within 60° of the receiving courier's direction) — otherwise no safe move exists
+    // this pass, and we stop rather than force an incoherent relocation.
+    const candidate = ranked[0];
+    if (!candidate || candidate.angularDist > 60) return;
+
+    const moveAddr = candidate.addr;
     moveAddr.courierId = shortest.courier.id;
     moveAddr.manuallyAssigned = false;
 
