@@ -774,7 +774,7 @@ input[type=file]{display:none;}
 
     <!-- TAB: ADRESE -->
     <div class="panel" id="panel-adrese">
-      <div style="flex-shrink:1; overflow-y:auto; max-height:60%;">
+      <div style="flex-shrink:0;">
         <div class="section">
           <div class="section-title"><span>Import adrese</span></div>
           <div class="dropzone" id="dropzone">
@@ -783,7 +783,6 @@ input[type=file]{display:none;}
             <div class="dz-sub">CSV sau XLSX · nume, telefon, adresă, sumă, plată</div>
           </div>
           <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
-          <div class="hint" id="columnPicker" style="display:none;"></div>
           <button class="btn btn-ghost btn-block" id="addManualBtn" style="margin-top:10px;">+ Adaugă adresă manual</button>
           <button class="btn btn-ghost btn-block btn-sm" id="resetAddressesBtn" style="margin-top:8px; color:var(--danger); border-color:var(--line);">Resetează adrese</button>
         </div>
@@ -801,7 +800,7 @@ input[type=file]{display:none;}
           <button class="btn btn-ghost btn-block btn-sm" id="manageVerifiedDbBtn">Gestionează baza</button>
         </div>
       </div>
-      <div class="addr-list" id="addrList" style="flex:1; min-height:0;">
+      <div class="addr-list" id="addrList" style="flex:1; min-height:0; overflow-y:auto;">
         <div class="empty-state">
           <div class="es-icon">▦</div>
           <div class="es-title">Nicio adresă încărcată</div>
