@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/29417789/README.md)
 # Trasee Curieri
 
 Aplicație web pentru planificarea automată a traseelor de livrare ale curierilor, cu repartizare optimizată a adreselor, calcul de intervale orare de livrare și export Excel.
@@ -17,7 +18,7 @@ Construită pentru livrări în **București, Ilfov și zona limitrofă**.
 - **Reset granular**: buton de resetare independent pentru curieri, pentru adrese, și pentru trasee — plus un buton global "Resetează tot"
 - **Repartizare automată** a adreselor pe curieri, în 2 pași:
   1. partiționare în sectoare unghiulare (felii radiale din centrul livrărilor zilei) — fiecare curier primește o "felie" contiguă a orașului, nu o zonă arbitrară care poate uni două cartiere opuse prin centru
-  2. rafinare pe timp total de traseu (buffer de 2h între curieri)
+  2. rafinare pe timp total de traseu (buffer de 2h între curieri), care mută doar adrese aflate la marginea unghiulară a sectorului (max 60° față de direcția curierului care primește), pentru a nu rupe coerența geografică a sectoarelor deja formate
 - **Optimizare rută** per curier via OSRM (timp/distanță reală pe drum, nu linie dreaptă)
 - **Intervale de livrare** calculate automat: ora estimată de sosire + buffer de predare, rotunjită la fereastră fixă de 2 ore
 - **Editare manuală**: corectare adresă, realocare manuală către alt curier (cu blocare împotriva rescrierii la următoarea repartizare automată), ajustare poziție pin direct pe hartă (drag & drop)
