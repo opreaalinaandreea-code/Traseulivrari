@@ -1435,7 +1435,7 @@ const TIME_BALANCE_BUFFER_MIN = 120; // up to 2h difference in total route time 
  * refusing to drop a courier below COUNT_BUFFER-worth of addresses relative to the rest.
  */
 async function balanceRoutesByTime(couriers){
-  const MAX_PASSES = 8;
+  const MAX_PASSES = 20;
   for (let pass = 0; pass < MAX_PASSES; pass++){
     const withRoutes = couriers
       .map(c => ({ courier: c, route: state.routes[c.id] }))
@@ -1476,11 +1476,14 @@ async function balanceRoutesByTime(couriers){
       return { addr: a, angularDist: diff };
     }).sort((a, b) => a.angularDist - b.angularDist);
 
-    // Only the closest-bearing candidate is eligible, and only if it's a genuine edge case
-    // (within 60° of the receiving courier's direction) — otherwise no safe move exists
-    // this pass, and we stop rather than force an incoherent relocation.
+    // Always move the address sitting at the edge of the longest courier's sector that
+    // faces most directly toward the shortest courier — this is, by construction, the
+    // least disruptive address to relocate, whether the two sectors are adjacent or on
+    // opposite sides of the center. There's no absolute angle cutoff: ranking by angular
+    // distance already guarantees we pick the edge-most candidate, not one from deep
+    // inside the sector, regardless of how far apart the two sectors happen to be.
     const candidate = ranked[0];
-    if (!candidate || candidate.angularDist > 60) return;
+    if (!candidate) return;
 
     const moveAddr = candidate.addr;
     moveAddr.courierId = shortest.courier.id;
