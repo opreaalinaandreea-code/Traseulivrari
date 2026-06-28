@@ -1685,48 +1685,147 @@ function haversine(lat1, lon1, lat2, lon2){
 // Build coordinate list: start -> stops -> end, ask OSRM /trip for optimized order of stops
 const STOP_BUFFER_MIN = 10; // fixed handoff/buffer time added per delivery stop
 
+/**
+ * Fetches a full pairwise driving-duration matrix for a list of {lat,lng} points via
+ * OSRM Table Service. Returns durations in seconds as a 2D array, or null on failure.
+ */
+async function fetchDurationMatrix(points){
+  const coordStr = points.map(p => `${p.lng},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/table/v1/driving/${coordStr}?annotations=duration`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.durations) return null;
+  return data.durations; // durations[i][j] = seconds from point i to point j
+}
+
+/**
+ * Classic 2-opt local search: repeatedly reverses a segment of the route whenever doing so
+ * shortens total travel time, until no further improvement is found. Operates on indices
+ * into `points`, where index 0 is the fixed start and the last index is the fixed end —
+ * only the order of the middle stops (1..n-2) is ever changed, since the courier's start
+ * and end points are not negotiable.
+ *
+ * This is far better suited to 10-20 stop problems than OSRM Trip's farthest-insertion
+ * heuristic, which is documented to only approximate and can produce visually incoherent
+ * "backtracking" routes — exactly the zig-zag pattern seen in practice with Trip Service.
+ */
+function twoOptOptimize(matrix, initialOrder){
+  let order = initialOrder.slice();
+  const routeLength = (ord) => {
+    let total = 0;
+    for (let i = 0; i < ord.length - 1; i++) total += matrix[ord[i]][ord[i+1]];
+    return total;
+  };
+
+  let improved = true;
+  let iterations = 0;
+  const maxIterations = 200; // safety cap; real loops converge in far fewer passes for ~20 stops
+  while (improved && iterations < maxIterations){
+    improved = false;
+    iterations++;
+    // i and j range over the MIDDLE stops only (1..length-2), never touching index 0
+    // (fixed start) or the last index (fixed end)
+    for (let i = 1; i < order.length - 2; i++){
+      for (let j = i + 1; j < order.length - 1; j++){
+        const a = order[i-1], b = order[i], c = order[j], d = order[j+1];
+        const currentCost = matrix[a][b] + matrix[c][d];
+        const swappedCost = matrix[a][c] + matrix[b][d];
+        if (swappedCost < currentCost - 0.01){ // small epsilon to avoid float-noise thrashing
+          // reverse the segment between i and j
+          const segment = order.slice(i, j+1).reverse();
+          order = [...order.slice(0, i), ...segment, ...order.slice(j+1)];
+          improved = true;
+        }
+      }
+    }
+  }
+  return order;
+}
+
+/**
+ * Builds an initial nearest-neighbor tour over the middle stops (indices 1..n-2), starting
+ * from the fixed start point (index 0) and always choosing the closest unvisited stop next.
+ * This seed is then refined by 2-opt — starting from a reasonable tour converges faster
+ * and more reliably than starting from the input order.
+ */
+function nearestNeighborOrder(matrix, numPoints){
+  const middleIndices = [];
+  for (let i = 1; i < numPoints - 1; i++) middleIndices.push(i);
+
+  const order = [0];
+  const remaining = new Set(middleIndices);
+  let current = 0;
+  while (remaining.size){
+    let best = null, bestDist = Infinity;
+    remaining.forEach(idx => {
+      if (matrix[current][idx] < bestDist){ bestDist = matrix[current][idx]; best = idx; }
+    });
+    order.push(best);
+    remaining.delete(best);
+    current = best;
+  }
+  order.push(numPoints - 1);
+  return order;
+}
+
 async function computeOptimizedRoute(courier, stops){
   const end = courier.sameAsStart || courier.end.status !== 'ok' ? courier.start : courier.end;
-
-  // OSRM trip service optimizes order but for fixed start/end we use 'roundtrip=false' with source/destination fixed
-  const coords = [courier.start, ...stops.map(s => ({lat:s.lat,lng:s.lng})), end];
-  const coordStr = coords.map(c => `${c.lng},${c.lat}`).join(';');
+  const points = [courier.start, ...stops.map(s => ({lat:s.lat,lng:s.lng})), end];
 
   try {
-    const url = `https://router.project-osrm.org/trip/v1/driving/${coordStr}?source=first&destination=last&roundtrip=false&overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // 1. Get the real driving-time matrix between every pair of points
+    const matrix = await fetchDurationMatrix(points);
+    if (!matrix) throw new Error('Table service returned no data');
 
-    if (data.code === 'Ok' && data.trips && data.trips.length){
-      const trip = data.trips[0];
-      const waypoints = data.waypoints;
-      // waypoints array maps input index -> {waypoint_index (order), trips_index}
-      // indices 0 = start, last = end, in-between = stops in original order
-      const stopOrder = [];
-      for (let i = 1; i <= stops.length; i++){
-        stopOrder.push({ stop: stops[i-1], order: waypoints[i].waypoint_index });
-      }
-      stopOrder.sort((a,b) => a.order - b.order);
-      const orderedIds = stopOrder.map(s => s.stop.id);
+    // 2. Find a good visiting order locally: nearest-neighbor seed, refined by 2-opt.
+    //    Indices 0 and (points.length-1) stay fixed as start/end throughout.
+    const seedOrder = nearestNeighborOrder(matrix, points.length);
+    const optimizedOrder = twoOptOptimize(matrix, seedOrder);
 
-      // trip.legs[i] is the driving leg FROM visit-position i TO visit-position i+1,
-      // in optimized order (0 = start->firstStop, ..., last = lastStop->end)
-      const legDurationsMin = (trip.legs || []).map(leg => leg.duration / 60);
+    // optimizedOrder is a list of point-indices; translate the middle ones back to stops
+    const orderedIds = optimizedOrder.slice(1, -1).map(idx => stops[idx - 1].id);
 
-      state.routes[courier.id] = {
-        order: orderedIds,
-        totalKm: trip.distance / 1000,
-        totalMin: trip.duration / 60,
-        geometry: trip.geometry,
-        legDurationsMin // array: driving time in minutes for each leg, start->stop1->stop2->...->end
-      };
-      computeDeliveryWindows(courier, state.routes[courier.id]);
-    } else {
-      // fallback: nearest-neighbor heuristic if OSRM trip fails
-      fallbackRoute(courier, stops, end);
+    // per-leg duration, in the final optimized order
+    const legDurationsMin = [];
+    for (let i = 0; i < optimizedOrder.length - 1; i++){
+      legDurationsMin.push(matrix[optimizedOrder[i]][optimizedOrder[i+1]] / 60);
     }
+    const totalMin = legDurationsMin.reduce((s, m) => s + m, 0);
+
+    // 3. Fetch the real geometry (for drawing on the map) and total distance via Route
+    //    Service, using the now-fixed optimized order — Route Service draws the path
+    //    through the given points in the given order, it does not reorder them.
+    const orderedPoints = optimizedOrder.map(idx => points[idx]);
+    const routeCoordStr = orderedPoints.map(p => `${p.lng},${p.lat}`).join(';');
+    let geometry = null, totalKm = null;
+    try {
+      const routeUrl = `https://router.project-osrm.org/route/v1/driving/${routeCoordStr}?overview=full&geometries=geojson`;
+      const routeRes = await fetch(routeUrl);
+      const routeData = await routeRes.json();
+      if (routeData.code === 'Ok' && routeData.routes && routeData.routes.length){
+        geometry = routeData.routes[0].geometry;
+        totalKm = routeData.routes[0].distance / 1000;
+      }
+    } catch (e){
+      console.error('OSRM route geometry fetch failed', e);
+    }
+    if (totalKm == null){
+      // Route Service failed but we still have real driving times from the Table Service —
+      // approximate distance from time at a typical urban average so the UI never crashes
+      // on a null totalKm, and geometry simply stays unavailable (straight-line fallback draw)
+      totalKm = totalMin / 60 * 35;
+    }
+
+    state.routes[courier.id] = {
+      order: orderedIds,
+      totalKm,
+      totalMin,
+      geometry,
+      legDurationsMin
+    };
+    computeDeliveryWindows(courier, state.routes[courier.id]);
   } catch (e){
-    console.error('OSRM error', e);
+    console.error('Route optimization error', e);
     fallbackRoute(courier, stops, end);
   }
 }
