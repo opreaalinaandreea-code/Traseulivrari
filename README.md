@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/29434578/README.md)
+[README.md](https://github.com/user-attachments/files/29434769/README.md)
 # Trasee Curieri
 
 Aplicație web pentru planificarea automată a traseelor de livrare ale curierilor, cu repartizare optimizată a adreselor, calcul de intervale orare de livrare și export Excel.
@@ -19,7 +19,7 @@ Construită pentru livrări în **București, Ilfov și zona limitrofă**.
 - **Repartizare automată** a adreselor pe curieri, în 2 pași:
   1. partiționare în sectoare unghiulare (felii radiale din centrul livrărilor zilei) — fiecare curier primește o "felie" contiguă a orașului, nu o zonă arbitrară care poate uni două cartiere opuse prin centru
   2. rafinare pe timp total de traseu (buffer de 2h între curieri), care mută adresele de la marginea sectorului celui mai încărcat — cea mai apropiată unghiular de direcția curierului mai puțin încărcat — pentru a nu rupe coerența geografică a sectoarelor
-- **Optimizare rută** per curier via OSRM (timp/distanță reală pe drum, nu linie dreaptă)
+- **Optimizare rută** per curier — matrice reală de timpi de drum (OSRM Table Service) + algoritm 2-opt local search pentru ordinea de vizitare, apoi geometrie reală desenată pe hartă (OSRM Route Service) cu ordinea fixată. Înlocuiește OSRM Trip Service, care pentru 10+ puncte folosește doar o euristică de aproximare (farthest-insertion) ce putea produce trasee cu salturi vizual incoerente.
 - **Intervale de livrare** calculate automat: ora estimată de sosire + buffer de predare, rotunjită la fereastră fixă de 2 ore
 - **Editare manuală**: corectare adresă, realocare manuală către alt curier (cu blocare împotriva rescrierii la următoarea repartizare automată), ajustare poziție pin direct pe hartă (drag & drop). Importul cu mapare de coloane și adăugarea manuală a unei adrese se fac în ferestre modale, independente de layout-ul barei laterale.
 - **Control fin al traseelor** (tab Trasee): reordonare cu mâner de drag dedicat sau săgeți ▲▼, realocare directă către alt curier dintr-un selector pe fiecare adresă, selecție multiplă + mutare în bloc către un curier
